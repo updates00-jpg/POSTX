@@ -943,10 +943,35 @@ const styleDescriptions = {
 
 // ── Stance ──
 const stanceDescriptions = {
-  krytykuj: 'STANOWISKO - KRYTYCZNE: Twoj post ma POLEMIZOWAC z teza lub opinia zawarta w temacie/komentarzu. Jesli ktos krytykuje Trumpa - Ty go bronisz. Jesli ktos chwali rzad - Ty go atakujesz. Zajmij PRZECIWNE stanowisko niz prezentuje temat. Obron adwersarza lub zdemontuj argument autora.',
-  pochwal: 'STANOWISKO - POTWIERDZAJACE: Twoj post ma ZGADZAC SIE z teza lub opinia zawarta w temacie/komentarzu i ja WZMACNIAC. Jesli ktos krytykuje Trumpa - Ty tez go krytykujesz i dodajesz swoje argumenty. Ton: swieta racja, a do tego jeszcze... Wzmocnij przekaz autora swoimi argumentami.',
-  neutralnie: 'STANOWISKO - NEUTRALNE: Przedstaw temat rzeczowo i bez oceny. Nie zajmuj strony ani autora ani jego oponentow. Ton dziennikarski - same fakty i kontekst.',
-  prowokuj: 'STANOWISKO - PROWOKUJACE: Zaproponuj TRZECI, NIEOCZEKIWANY punkt widzenia ktorego ani autor ani jego oponenci nie biorą pod uwage. Zmusz do refleksji. Moze byc paradoksalne, przekorne lub wskazywac na cos co wszyscy przeoczyli. Nie zgadzaj sie ani z jedna ani z druga strona.',
+  krytykuj: [
+    'STANOWISKO = KRYTYCZNE. To jest NAJWAZNIEJSZA instrukcja.',
+    'Twoj post ma KRYTYKOWAC i ATAKOWAC temat/podmiot podany przez uzytkownika.',
+    'Jesli temat to "Ukraincy" - napisz post krytyczny wobec Ukraincow.',
+    'Jesli temat to "rzad" - napisz post krytyczny wobec rzadu.',
+    'Jesli temat to "Trump" - napisz post krytyczny wobec Trumpa.',
+    'ZAKAZ: Nie wolno bronić podmiotu tematu. Nie wolno pisac wywazonego posta. Nie wolno przedstawiac "obu stron". Tylko krytyka.',
+  ].join(' '),
+  pochwal: [
+    'STANOWISKO = POCHWALNE. To jest NAJWAZNIEJSZA instrukcja.',
+    'Twoj post ma CHWALI i BRONIC temat/podmiot podany przez uzytkownika.',
+    'Jesli temat to "Ukraincy" - napisz post pozytywny o Ukraincach, broń ich.',
+    'Jesli temat to "rzad" - napisz post pochwalny o rzadzie.',
+    'Jesli temat to "Trump" - napisz post broniacy Trumpa.',
+    'ZAKAZ: Nie wolno krytykowac podmiotu tematu. Tylko pochwala i obrona.',
+  ].join(' '),
+  neutralnie: [
+    'STANOWISKO = NEUTRALNE. To jest NAJWAZNIEJSZA instrukcja.',
+    'Twoj post ma przedstawiac temat RZECZOWO i BEZ OCENY.',
+    'Nie chwal i nie krytykuj podmiotu. Tylko fakty i kontekst.',
+    'ZAKAZ: Zadnych emocji, zadnej strony, zadnej oceny moralnej.',
+  ].join(' '),
+  prowokuj: [
+    'STANOWISKO = PROWOKUJACE. To jest NAJWAZNIEJSZA instrukcja.',
+    'Twoj post ma prezentowac TRZECI, NIEOCZEKIWANY punkt widzenia.',
+    'Nie zgadzaj sie ani z krytyka ani z obron podmiotu - zaproponuj cos czego nikt nie bierze pod uwage.',
+    'Zmusz czytelnika do refleksji. Moze byc paradoksalne lub przekorne.',
+    'ZAKAZ: Nie pisz standardowego komentarza pro ani contra.',
+  ].join(' '),
 };
 
 function selectStance(el, tab) {
@@ -1100,7 +1125,7 @@ async function generatePost() {
       'TEMAT: ' + topic,
       'TECHNIKA (drugorzedna wobec stanowiska): ' + angle,
       avoidList,
-      'ZADANIE: 1. Wyszukaj aktualne info o temacie. 2. Znajdz 1 zrodlo. 3. Napisz post zgodnie z instrukcjami powyzej.',
+      'ZADANIE: Na podstawie swojej wiedzy o temacie napisz post. Podaj realne istniejace zrodlo (artykul, portal informacyjny) ktory dotyczy tego tematu - moze byc z ostatnich miesiecy. Napisz post zgodnie z instrukcjami powyzej.',
       'Odpowiedz TYLKO JSON bez zadnego tekstu przed ani po: {"post":"tekst posta","source_title":"tytul","source_url":"https://...","topic_summary":"1 zdanie"}'
     ].join('\n\n');
 
@@ -1400,7 +1425,35 @@ async function generateComment() {
   const avoidStr = prev.length > 0 ? 'Nie powtarzaj tych poprzednich komentarzy: ' + prev.map((c,i)=>`[${i+1}] ${c.slice(0,60)}`).join(' | ') : '';
 
   // Stanowisko jako PIERWSZA i NAJWAZNIEJSZA instrukcja
-  const stanceInstruction = stanceDescriptions[currentCommentStance];
+  // W komentarzu "krytykuj" = polemizuj z autorem wpisu
+  const commentStanceDescriptions = {
+    krytykuj: [
+      'STANOWISKO = POLEMIKA Z AUTOREM. To jest NAJWAZNIEJSZA instrukcja.',
+      'Twoj komentarz ma ATAKOWAC i KRYTYKOWAC autora wklejonego wpisu oraz jego teze.',
+      'Zajmij PRZECIWNE stanowisko niz autor wpisu. Obron to co autor atakuje lub zdemontuj jego argument.',
+      'ZAKAZ: Nie wolno zgadzac sie z autorem. Nie wolno pisac "racja" ani potwierdzac jego tezy.',
+    ].join(' '),
+    pochwal: [
+      'STANOWISKO = ZGODA Z AUTOREM. To jest NAJWAZNIEJSZA instrukcja.',
+      'Twoj komentarz ma POTWIERDZAC i WZMACNIAC teze autora wklejonego wpisu.',
+      'Zgadz sie z autorem i dodaj swoje argumenty ktore jeszcze bardziej potwierdzaja jego racje.',
+      'Ton: swieta racja, a do tego jeszcze...',
+      'ZAKAZ: Nie wolno polemizowac z autorem. Tylko poparcie i wzmocnienie jego tezy.',
+    ].join(' '),
+    neutralnie: [
+      'STANOWISKO = NEUTRALNE. To jest NAJWAZNIEJSZA instrukcja.',
+      'Twoj komentarz ma odnosic sie do wpisu rzeczowo i bez zajmowania strony.',
+      'Dodaj kontekst lub fakty bez oceniania czy autor ma racje czy nie.',
+      'ZAKAZ: Zadnych emocji, zadnej strony, zadnej oceny.',
+    ].join(' '),
+    prowokuj: [
+      'STANOWISKO = PROWOKUJACE. To jest NAJWAZNIEJSZA instrukcja.',
+      'Twoj komentarz ma prezentowac TRZECI punkt widzenia ktorego autor wpisu nie bierze pod uwage.',
+      'Nie zgadzaj sie ani z autorem ani z jego oponentami - zaproponuj cos nieoczekiwanego.',
+      'ZAKAZ: Nie pisz standardowego pro ani contra wobec wpisu.',
+    ].join(' '),
+  };
+  const stanceInstruction = commentStanceDescriptions[currentCommentStance];
 
   const prompt = [
     '=== NAJWAZNIEJSZA INSTRUKCJA - PRZECZYTAJ NAJPIERW ===',
