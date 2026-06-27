@@ -857,44 +857,38 @@ async function generatePost() {
 
   try {
     const styleDesc = styleDescriptions[currentStyle];
-    const regenCount = currentTopic === topic ? (window._regenCount = (window._regenCount || 0) + 1) : (window._regenCount = 1);
+
+    // Globalny licznik — rosnie z kazdym kliknieciem Generuj/Regeneruj
+    window._regenCount = (window._regenCount || 0) + 1;
+    const regenCount = window._regenCount;
 
     const angles = [
-      'Napisz post zaczynając od zaskakującego faktu lub liczby.',
-      'Napisz post w formie ostrego komentarza lub tezy do obrony.',
-      'Napisz post zadając prowokacyjne pytanie retoryczne.',
-      'Napisz post zaczynając od osobistej obserwacji lub anegdoty.',
-      'Napisz post pokazując absurd lub sprzeczność w temacie.',
-      'Napisz post jako krótka prognoza lub przestroga.',
-      'Napisz post porównując dwie przeciwstawne perspektywy.',
+      'Zacznij od zaskakujacego faktu lub liczby ktorej czytelnik nie zna.',
+      'Napisz jako ostry komentarz — postaw teze i udowodnij ja w 2 zdaniach.',
+      'Zadaj prowokacyjne pytanie retoryczne na poczatku.',
+      'Zacznij od konkretnej, jednostkowej sytuacji i wyciagnij z niej wniosek ogolny.',
+      'Pokaz absurd lub sprzecznosc — zestaw dwa fakty ktore sie wykluczaja.',
+      'Napisz jako ostrzezenie lub prognoze — co sie stanie jesli nic sie nie zmieni.',
+      'Zacznij od puenty, potem podaj uzasadnienie — odwrocona piramida.',
     ];
     const angle = angles[(regenCount - 1) % angles.length];
-    const seed = Math.random().toString(36).slice(2, 8);
+    const seed = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
-    const previousPosts = (window._generatedPosts || []).slice(-3).join('\n---\n');
-    const avoidSection = previousPosts ? `\nUNIKAJ podobieństwa do tych poprzednich postów:\n${previousPosts}\n` : '';
+    // Poprzednie posty jako lista do unikania
+    const prev = (window._generatedPosts || []).slice(-4);
+    const avoidList = prev.length > 0
+      ? 'WAZNE: Te posty juz zostaly wygenerowane, NIE powtarzaj ich struktury ani slow kluczowych: ' + prev.map((p,i) => `[${i+1}] ${p.slice(0,80)}`).join(' | ')
+      : '';
 
-    const prompt = `Jesteś agentem tworzącym posty na X (Twitter) dla @__Ka_mil_. [${seed}]
-
-${styleDesc}
-
-ZADANIE:
-1. Wyszukaj aktualne informacje na temat: "${topic}"
-2. Znajdź 1 konkretne, aktualne źródło (tytuł + URL)
-3. Napisz post na X
-
-KĄT NARRACYJNY (zastosuj koniecznie):
-${angle}
-
-WYMAGANIA POSTA:
-- Maksymalnie 280 znaków
-- W stylu opisanym powyżej
-- Oparty na faktach ze źródła
-- Naturalny, autentyczny głos
-- ORYGINALNY — za każdym razem inny punkt wejścia w temat
-${avoidSection}
-Odpowiedz TYLKO w formacie JSON (bez żadnego tekstu przed ani po):
-{"post":"treść posta max 280 znaków","source_title":"tytuł artykułu","source_url":"https://...","topic_summary":"1 zdanie o czym jest post"}`;
+    const prompt = [
+      'Jestes agentem tworzacym posty na X dla @__Ka_mil_. Seed:' + seed,
+      styleDesc,
+      'TEMAT: ' + topic,
+      'KAT NARRACYJNY (obowiazkowy): ' + angle,
+      avoidList,
+      'ZADANIE: 1. Wyszukaj aktualne info o temacie. 2. Znajdz 1 zrodlo. 3. Napisz post MAX 280 znakow w podanym stylu i kacie narracyjnym.',
+      'Odpowiedz TYLKO JSON bez zadnego tekstu przed ani po: {"post":"tekst posta","source_title":"tytul","source_url":"https://...","topic_summary":"1 zdanie"}'
+    ].join('\n\n');
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -907,6 +901,7 @@ Odpowiedz TYLKO w formacie JSON (bez żadnego tekstu przed ani po):
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,
+        temperature: 1,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{ role: 'user', content: prompt }]
       })
