@@ -1116,7 +1116,6 @@ async function generatePost() {
         model: 'claude-sonnet-4-6',
         max_tokens: 2048,
         temperature: 1,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -1124,45 +1123,8 @@ async function generatePost() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error?.message || 'Błąd API');
 
-    // Handle multi-turn: if stop_reason is tool_use, send results back
     let textContent = '';
-    let finalData = data;
-
-    if (data.stop_reason === 'tool_use') {
-      // Build messages with tool results
-      const toolResults = data.content
-        .filter(b => b.type === 'tool_use')
-        .map(b => ({
-          type: 'tool_result',
-          tool_use_id: b.id,
-          content: b.input ? JSON.stringify(b.input) : 'search completed'
-        }));
-
-      const response2 = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2048,
-          temperature: 1,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [
-            { role: 'user', content: prompt },
-            { role: 'assistant', content: data.content },
-            { role: 'user', content: toolResults }
-          ]
-        })
-      });
-      finalData = await response2.json();
-      if (!response2.ok) throw new Error(finalData.error?.message || 'Błąd API (turn 2)');
-    }
-
-    for (const block of (finalData.content || [])) {
+    for (const block of (data.content || [])) {
       if (block.type === 'text') textContent += block.text;
     }
 
