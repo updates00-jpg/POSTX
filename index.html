@@ -921,11 +921,37 @@ Odpowiedz TYLKO w formacie JSON (bez żadnego tekstu przed ani po):
       if (block.type === 'text') textContent += block.text;
     }
 
-    // Parse JSON from response
+    // Parse JSON from response - robust parser
     const jsonMatch = textContent.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Brak JSON w odpowiedzi');
 
-    const result = JSON.parse(jsonMatch[0]);
+    let rawJson = jsonMatch[0];
+
+    // Fix common JSON issues from Claude
+    rawJson = rawJson
+      .replace(/[\u201C\u201D]/g, '"')   // curly double quotes → straight
+      .replace(/[\u2018\u2019]/g, "'")   // curly single quotes → straight
+      .replace(/[\u2013\u2014]/g, '-')   // em/en dash → hyphen
+      .replace(/\n/g, ' ')               // newlines inside values
+      .replace(/,\s*}/g, '}')            // trailing commas
+      .replace(/,\s*]/g, ']');           // trailing commas in arrays
+
+    let result;
+    try {
+      result = JSON.parse(rawJson);
+    } catch(e) {
+      // Last resort: extract fields manually with regex
+      const postMatch = textContent.match(/"post"\s*:\s*"([\s\S]*?)(?<!\\)"/);
+      const titleMatch = textContent.match(/"source_title"\s*:\s*"([\s\S]*?)(?<!\\)"/);
+      const urlMatch = textContent.match(/"source_url"\s*:\s*"(https?:\/\/[^"]+)"/);
+      if (!postMatch) throw new Error('Nie udało się sparsować odpowiedzi');
+      result = {
+        post: postMatch[1].replace(/\\"/g, '"'),
+        source_title: titleMatch ? titleMatch[1] : '',
+        source_url: urlMatch ? urlMatch[1] : '',
+        topic_summary: ''
+      };
+    }
     currentPost = result.post;
     currentSource = { title: result.source_title, url: result.source_url };
 
