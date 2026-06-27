@@ -650,6 +650,22 @@
       </div>
     </div>
 
+    <!-- Length selector -->
+    <div class="card">
+      <div class="card-title">Długość</div>
+      <div class="stance-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <button class="stance-btn" data-length="krotki" onclick="selectLength(this, 'generate')">
+          <span class="stance-icon">⚡</span>Krótki
+        </button>
+        <button class="stance-btn active" data-length="sredni" onclick="selectLength(this, 'generate')">
+          <span class="stance-icon">📝</span>Średni
+        </button>
+        <button class="stance-btn" data-length="dlugi" onclick="selectLength(this, 'generate')">
+          <span class="stance-icon">📖</span>Długi
+        </button>
+      </div>
+    </div>
+
     <!-- Topic -->
     <div class="card">
       <div class="card-title">Temat</div>
@@ -774,6 +790,22 @@
       </div>
     </div>
 
+    <!-- Length selector comment -->
+    <div class="card">
+      <div class="card-title">Długość</div>
+      <div class="stance-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <button class="stance-btn" data-length="krotki" onclick="selectLength(this, 'comment')">
+          <span class="stance-icon">⚡</span>Krótki
+        </button>
+        <button class="stance-btn active" data-length="sredni" onclick="selectLength(this, 'comment')">
+          <span class="stance-icon">📝</span>Średni
+        </button>
+        <button class="stance-btn" data-length="dlugi" onclick="selectLength(this, 'comment')">
+          <span class="stance-icon">📖</span>Długi
+        </button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title">Wklej wpis z X</div>
       <textarea class="tweet-textarea" id="commentInput" placeholder="Wklej tutaj treść tweeta lub link do wpisu który chcesz skomentować..." style="border-color:var(--border);min-height:110px"></textarea>
@@ -873,6 +905,8 @@ let editMode = false;
 let history = JSON.parse(localStorage.getItem('post_history') || '[]');
 let currentStance = 'krytykuj';
 let currentCommentStance = 'krytykuj';
+let currentLength = 'sredni';
+let currentCommentLength = 'sredni';
 
 // ── Style descriptions for Claude ──
 const styleDescriptions = {
@@ -917,10 +951,25 @@ const stanceDescriptions = {
 
 function selectStance(el, tab) {
   const container = tab === 'generate' ? '#tab-generate' : '#tab-comment';
-  document.querySelectorAll(container + ' .stance-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll(container + ' .stance-btn[data-stance]').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   if (tab === 'generate') currentStance = el.dataset.stance;
   else currentCommentStance = el.dataset.stance;
+}
+
+// ── Length ──
+const lengthDescriptions = {
+  krotki: 'DLUGOSC: Napisz BARDZO KROTKO — maksymalnie 1-2 zdania, absolutnie nie wiecej niz 140 znakow. Sama esencja, zero zbednych slow.',
+  sredni: 'DLUGOSC: Napisz SREDNIO — 3-5 zdan, okolo 200-400 znakow. Krotkie rozwinienie mysli.',
+  dlugi: 'DLUGOSC: Napisz DLUGO i WYCZERPUJACO — pelna argumentacja, detale, kontekst. Mozesz uzyc do 2500 znakow.',
+};
+
+function selectLength(el, tab) {
+  const container = tab === 'generate' ? '#tab-generate' : '#tab-comment';
+  document.querySelectorAll(container + ' .stance-btn[data-length]').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  if (tab === 'generate') currentLength = el.dataset.length;
+  else currentCommentLength = el.dataset.length;
 }
 function switchTab(tab) {
   const tabs = ['generate','comment','history'];
@@ -1043,6 +1092,7 @@ async function generatePost() {
     const prompt = [
       '=== NAJWAZNIEJSZA INSTRUKCJA - PRZECZYTAJ NAJPIERW ===',
       stanceDescriptions[currentStance],
+      lengthDescriptions[currentLength],
       '=== KONIEC NAJWAZNIEJSZEJ INSTRUKCJI ===',
       '',
       'Piszesz post na X dla @__Ka_mil_. Seed:' + seed,
@@ -1050,7 +1100,7 @@ async function generatePost() {
       'TEMAT: ' + topic,
       'TECHNIKA (drugorzedna wobec stanowiska): ' + angle,
       avoidList,
-      'ZADANIE: 1. Wyszukaj aktualne info o temacie. 2. Znajdz 1 zrodlo. 3. Napisz post MAX 2500 znakow. PAMIETAJ: stanowisko powyzej jest OBOWIAZKOWE i NADRZEDNE.',
+      'ZADANIE: 1. Wyszukaj aktualne info o temacie. 2. Znajdz 1 zrodlo. 3. Napisz post zgodnie z instrukcjami powyzej.',
       'Odpowiedz TYLKO JSON bez zadnego tekstu przed ani po: {"post":"tekst posta","source_title":"tytul","source_url":"https://...","topic_summary":"1 zdanie"}'
     ].join('\n\n');
 
@@ -1351,6 +1401,7 @@ async function generateComment() {
   const prompt = [
     '=== NAJWAZNIEJSZA INSTRUKCJA - PRZECZYTAJ NAJPIERW ===',
     stanceInstruction,
+    lengthDescriptions[currentCommentLength],
     '=== KONIEC NAJWAZNIEJSZEJ INSTRUKCJI ===',
     '',
     'Piszesz komentarz na X dla @__Ka_mil_. Seed:' + seed,
@@ -1358,7 +1409,7 @@ async function generateComment() {
     'WPIS DO SKOMENTOWANIA: ' + input,
     'TECHNIKA (drugorzedna wobec stanowiska): ' + angle,
     avoidStr,
-    'ZADANIE: Napisz komentarz. Max 2500 znakow. PAMIETAJ: stanowisko powyzej jest OBOWIAZKOWE i NADRZEDNE wobec wszystkiego innego.',
+    'ZADANIE: Napisz komentarz zgodnie z instrukcjami powyzej.',
     'Odpowiedz TYLKO JSON: {"comment":"tresc komentarza","topic_summary":"1 zdanie o co chodzi"}'
   ].join('\n\n');
 
