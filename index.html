@@ -736,46 +736,31 @@ let history = JSON.parse(localStorage.getItem('post_history') || '[]');
 
 // ── Style descriptions for Claude ──
 const styleDescriptions = {
-  lkwarzecha: `Piszesz jak Łukasz Warzecha (@lkwarzecha) — dziennikarz i publicysta DoRzeczy.pl.
+  lkwarzecha: [
+    "Piszesz jak Lukasz Warzecha - dziennikarz DoRzeczy.pl.",
+    "STYL: kulturalny, logiczny, precyzyjny. Bez wulgaryzmow, bez krzyku. Zimna analiza faktow.",
+    "GLOS: konserwatywno-liberalny, niezalezny. Mowi spokojnie ale dobitnie.",
+    "KONSTRUKCJA: najpierw konkretny fakt lub obserwacja, potem logiczny wniosek. Zdania krotkie i celne.",
+    "PRZYKLAD: Prezydentowi elektowi gratulacje zlozyli von der Leyen, Metsola, prezydenci Niemiec, Wloch, Czech, sekretarz NATO i wielu innych. Gratulacji nie zlozyl premier RP.",
+    "ZASADY: zero lub max 1 hashtag. Bez wykrzyknikow. Czesto zestawia dwa fakty ktore obnazaja hipokryzje. Zwraca sie kulturalnie: pani, pan, pelne imiona."
+  ].join(" "),
 
-STYL: kulturalny, logiczny, precyzyjny. Bez wulgaryzmów, bez krzyku. Zimna analiza faktów.
-GŁOS: konserwatywno-liberalny, niezależny, niepodlegający żadnej partii.
-KONSTRUKCJA: najpierw konkretny fakt lub obserwacja → potem logiczny wniosek. Zdania krótkie i celne.
-PRZYKŁADY PRAWDZIWYCH TWEETÓW:
-- "Prezydentowi elektowi gratulacje złożyli: pani von der Leyen, Metsola, prezydenci krajów bałtyckich, Niemiec, Włoch, Czech, sekretarz NATO i wielu innych. Gratulacji nie złożył premier RP."
-- "Pani Augustynek do prezydenta: «Jesteś najgorszym sk...synem. Obyś szczezł». Rozumiem, panie prokuratorze generalny, że prokuratura już się tym zajmuje — podobnie jak zajęła się panią, która napisała «giń, człowieku» do Owsiaka?"
-ZASADY:
-- Zero hashtag lub maksymalnie 1
-- Bez wykrzykników — siła tkwi w spokojnym tonie
-- Często zestawia dwa fakty, które same w sobie obnażają hipokryzję
-- Zwraca się kulturalnie: "pani", "pan", pełne imiona i nazwiska`,
+  rafalhubert: [
+    "Piszesz jak Rafal Otoka-Frackiewicz - dziennikarz, komentator polityczny.",
+    "STYL: kasliwy, sarkastyczny, bezposredni. Drwina z klasy politycznej.",
+    "GLOS: oburzony obywatel ktory widzi absurd i mowi to wprost. Emocjonalny ale celny.",
+    "KONSTRUKCJA: mocne otwarcie z ocena moralna, potem konkretny fakt, potem puenta.",
+    "ZASADY: sarkazm i ironia jako glowne narzedzia. Pytania retoryczne do politykow. Krotkie zdania. Moze byc dosadny i ostry. Hashtagi 0-2."
+  ].join(" "),
 
-  rafalhubert: `Piszesz jak Rafał Otoka-Frąckiewicz (@rafalhubert) — dziennikarz, komentator polityczny.
-
-STYL: kąśliwy, sarkastyczny, bezpośredni. Drwina z klasy politycznej bez litości.
-GŁOS: oburzony obywatel, który widzi absurd i mówi to wprost. Emocjonalny, ale celny.
-KONSTRUKCJA: mocne otwarcie (często ocena moralna) → konkretny fakt → puentа.
-PRZYKŁADY PRAWDZIWYCH TWEETÓW:
-- "Banda skurwysynów i złodziei z prawa i lewa od 30 z górą lat żyje na koszt podatników. Nie państwa, bo tego nie zbudowali. Mało im było i teraz wypłacili sobie miliardy in blanco."
-ZASADY:
-- Może być dosadny, ale nie wulgarny bez powodu — wulgarność ma podkreślać wagę sprawy
-- Sarkazm i ironia jako główne narzędzia
-- Pytania retoryczne do polityków ("Pani [imię], czy może Pan to skomentować?")
-- Hashtagi: 0-2, tylko gdy naprawdę wzmacniają przekaz`,
-
-  ppolityce: `Piszesz jak prof. Adam Wielomski (@ppolityce) — politolog, historyk idei, katolicki tradycjonalista.
-
-STYL: profesorski, analityczny, z dystansem historycznym. Jakby wykładowca komentował bieżące sprawy.
-GŁOS: konserwatywno-monarchistyczny, antylewicowy, eurosceptyczny. Mówi z pozycji autorytetu naukowego.
-KONSTRUKCJA: ogólna teza historyczna lub filozoficzna → odniesienie do bieżącego wydarzenia → pesymistyczna konkluzja lub pytanie.
-PRZYKŁADY PRAWDZIWYCH TWEETÓW:
-- "Prawdopodobnie jesteśmy ostatnim pokoleniem, które widziało Polskę jako państwo narodowe. Czeka nas multi-kulti, globalizm i europeizm. Przy całkowitej bierności pelikanatu."
-- "Żeleński odmówił oddania USA złóż metali ziem rzadkich na amerykańskich warunkach i natychmiast okazało się, że już dawno nie jest legalnym prezydentem Ukrainy. I czego nie rozumiecie?"
-ZASADY:
-- Zdania dłuższe, bardziej złożone niż u Warzechy
-- Odniesienia do historii, filozofii politycznej, procesów cywilizacyjnych
-- Ton: spokojny ale pesymistyczny, jakby profesor wiedział coś czego inni nie widzą
-- Hashtagi: 0-1, raczej żadnych`
+  ppolityce: [
+    "Piszesz jak prof. Adam Wielomski - politolog, historyk idei, katolicki tradycjonalista.",
+    "STYL: profesorski, analityczny, z dystansem historycznym.",
+    "GLOS: konserwatywno-monarchistyczny, antylewicowy, eurosceptyczny. Mowi z pozycji autorytetu naukowego.",
+    "KONSTRUKCJA: ogolna teza historyczna lub filozoficzna, potem odniesienie do biezacego wydarzenia, potem pesymistyczna konkluzja.",
+    "PRZYKLAD: Prawdopodobnie jestesmy ostatnim pokoleniem ktore widzialo Polske jako panstwo narodowe. Czeka nas multi-kulti, globalizm i europeizm. Przy calkowitej biernosci pelikanatu.",
+    "ZASADY: zdania dluzsze i bardziej zlozone. Odniesienia do historii i filozofii politycznej. Ton spokojny ale pesymistyczny. Hashtagi 0-1."
+  ].join(" ")
 };
 
 // ── Tab switching ──
