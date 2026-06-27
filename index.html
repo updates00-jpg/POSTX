@@ -1041,13 +1041,16 @@ async function generatePost() {
       : '';
 
     const prompt = [
-      'Jestes agentem tworzacym posty na X dla @__Ka_mil_. Seed:' + seed,
-      styleDesc,
+      '=== NAJWAZNIEJSZA INSTRUKCJA - PRZECZYTAJ NAJPIERW ===',
       stanceDescriptions[currentStance],
+      '=== KONIEC NAJWAZNIEJSZEJ INSTRUKCJI ===',
+      '',
+      'Piszesz post na X dla @__Ka_mil_. Seed:' + seed,
+      styleDesc,
       'TEMAT: ' + topic,
-      'KAT NARRACYJNY (obowiazkowy): ' + angle,
+      'TECHNIKA (drugorzedna wobec stanowiska): ' + angle,
       avoidList,
-      'ZADANIE: 1. Wyszukaj aktualne info o temacie. 2. Znajdz 1 zrodlo. 3. Napisz post MAX 2500 znakow w podanym stylu, stanowisku i kacie narracyjnym.',
+      'ZADANIE: 1. Wyszukaj aktualne info o temacie. 2. Znajdz 1 zrodlo. 3. Napisz post MAX 2500 znakow. PAMIETAJ: stanowisko powyzej jest OBOWIAZKOWE i NADRZEDNE.',
       'Odpowiedz TYLKO JSON bez zadnego tekstu przed ani po: {"post":"tekst posta","source_title":"tytul","source_url":"https://...","topic_summary":"1 zdanie"}'
     ].join('\n\n');
 
@@ -1308,27 +1311,54 @@ async function generateComment() {
   const seed = Date.now().toString(36) + Math.random().toString(36).slice(2,5);
   const styleDesc = styleDescriptions[currentCommentStyle];
 
-  const commentAngles = [
-    'Napisz krotki celny komentarz obnaazajacy falsz lub absurd tego wpisu.',
-    'Napisz komentarz w formie pytania retorycznego ktore demaskuje autora.',
-    'Skomentuj ironicznie — udaj ze sie zgadzasz ale tak by bylo jasne ze drwisz.',
-    'Napisz komentarz stawiajac kontrfakt ktory obala teze wpisu.',
-    'Napisz komentarz wskazujac hipokryzje autora lub sprzecznosc z jego wczesniejszymi slowami.',
-    'Napisz komentarz jako krotka ale druzgocaca puenta.',
-  ];
-  const angle = commentAngles[(window._commentRegenCount - 1) % commentAngles.length];
+  // Katy narracyjne zalezne od stanowiska
+  const anglesByStance = {
+    krytykuj: [
+      'Zacznij od kontrfaktu ktory obala teze autora.',
+      'Zadaj pytanie retoryczne ktore demaskuje blad w rozumowaniu autora.',
+      'Pokaz sprzecznosc lub absurd w argumencie autora.',
+      'Zdemontuj argument autora konkretna liczba lub faktem.',
+      'Obron podmiot ktory autor atakuje - pokaz ze autor sie myli.',
+    ],
+    pochwal: [
+      'Zacznij od potwierdzenia tezy autora i dodaj swoj mocny argument.',
+      'Wzmocnij argument autora dodajac dodatkowy fakt lub kontekst.',
+      'Napisz ze autor ma racje i rozwin jego mysl dalej.',
+      'Potwierdz teze autora i wskazuj na szerszy kontekst ktory ja wzmacnia.',
+      'Zgadz sie i dodaj cos czego autor nie powiedzial a co jeszcze bardziej potwierdza jego racje.',
+    ],
+    neutralnie: [
+      'Przedstaw obiektywny kontekst bez oceniania autora.',
+      'Podaj fakty i dane bez zajmowania strony.',
+      'Przedstaw argumenty obu stron rowno.',
+    ],
+    prowokuj: [
+      'Zaproponuj trzeci punkt widzenia ktorego nikt nie bierze pod uwage.',
+      'Wskazuj na cos co obie strony sporu przeoczaja.',
+      'Postaw paradoksalna teze ktora zmusza do refleksji.',
+      'Odwroc perspektywe - pokaz ze problem lezy zupelnie gdzie indziej.',
+    ],
+  };
+  const angles = anglesByStance[currentCommentStance] || anglesByStance.krytykuj;
+  const angle = angles[(window._commentRegenCount - 1) % angles.length];
 
   const prev = (window._prevComments || []).slice(-3);
   const avoidStr = prev.length > 0 ? 'Nie powtarzaj tych poprzednich komentarzy: ' + prev.map((c,i)=>`[${i+1}] ${c.slice(0,60)}`).join(' | ') : '';
 
+  // Stanowisko jako PIERWSZA i NAJWAZNIEJSZA instrukcja
+  const stanceInstruction = stanceDescriptions[currentCommentStance];
+
   const prompt = [
-    'Jestes agentem piszacym komentarze na X dla @__Ka_mil_. Seed:' + seed,
+    '=== NAJWAZNIEJSZA INSTRUKCJA - PRZECZYTAJ NAJPIERW ===',
+    stanceInstruction,
+    '=== KONIEC NAJWAZNIEJSZEJ INSTRUKCJI ===',
+    '',
+    'Piszesz komentarz na X dla @__Ka_mil_. Seed:' + seed,
     styleDesc,
-    stanceDescriptions[currentCommentStance],
-    'ORYGINALNY WPIS DO SKOMENTOWANIA: ' + input,
-    'KAT KOMENTARZA: ' + angle,
+    'WPIS DO SKOMENTOWANIA: ' + input,
+    'TECHNIKA (drugorzedna wobec stanowiska): ' + angle,
     avoidStr,
-    'ZADANIE: Napisz komentarz pod tym wpisem. Max 2500 znakow. W stylu i stanowisku opisanym powyzej. Komentarz ma byc celny, konkretny i bezposrednio odnosic sie do tresci wpisu.',
+    'ZADANIE: Napisz komentarz. Max 2500 znakow. PAMIETAJ: stanowisko powyzej jest OBOWIAZKOWE i NADRZEDNE wobec wszystkiego innego.',
     'Odpowiedz TYLKO JSON: {"comment":"tresc komentarza","topic_summary":"1 zdanie o co chodzi"}'
   ].join('\n\n');
 
