@@ -543,7 +543,32 @@
     .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
     .empty-state p { font-size: 15px; }
 
-    /* ── Regenerate ── */
+    /* ── Stance selector ── */
+    .stance-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stance-btn {
+      padding: 10px 8px;
+      border-radius: var(--r-sm);
+      border: 1.5px solid var(--border);
+      background: var(--bg3);
+      color: var(--text-mid);
+      cursor: pointer;
+      text-align: center;
+      transition: all .2s;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+    }
+    .stance-btn .stance-icon { font-size: 18px; display: block; margin-bottom: 3px; }
+    .stance-btn.active { border-color: var(--accent); background: var(--accent-dim); color: var(--text); }
+    .stance-btn:hover:not(.active) { border-color: #444; color: var(--text); }
+    .stance-btn[data-stance="krytykuj"].active { border-color: #F4212E; background: rgba(244,33,46,0.12); }
+    .stance-btn[data-stance="pochwal"].active { border-color: #00BA7C; background: rgba(0,186,124,0.12); }
+    .stance-btn[data-stance="neutralnie"].active { border-color: #71767B; background: rgba(113,118,123,0.12); }
+    .stance-btn[data-stance="prowokuj"].active { border-color: #FFD400; background: rgba(255,212,0,0.12); }
     .regen-row {
       display: flex;
       gap: 8px;
@@ -602,6 +627,25 @@
         </button>
         <button class="style-btn" data-style="ppolityce" onclick="selectStyle(this)">
           Wielomski<br><span class="handle">profesor</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stance selector -->
+    <div class="card">
+      <div class="card-title">Stanowisko</div>
+      <div class="stance-grid">
+        <button class="stance-btn active" data-stance="krytykuj" onclick="selectStance(this, 'generate')">
+          <span class="stance-icon">🔥</span>Krytykuj
+        </button>
+        <button class="stance-btn" data-stance="pochwal" onclick="selectStance(this, 'generate')">
+          <span class="stance-icon">👏</span>Pochwal
+        </button>
+        <button class="stance-btn" data-stance="neutralnie" onclick="selectStance(this, 'generate')">
+          <span class="stance-icon">⚖️</span>Neutralnie
+        </button>
+        <button class="stance-btn" data-stance="prowokuj" onclick="selectStance(this, 'generate')">
+          <span class="stance-icon">💥</span>Prowokuj
         </button>
       </div>
     </div>
@@ -711,6 +755,25 @@
       </div>
     </div>
 
+    <!-- Stance selector comment -->
+    <div class="card">
+      <div class="card-title">Stanowisko</div>
+      <div class="stance-grid">
+        <button class="stance-btn active" data-stance="krytykuj" onclick="selectStance(this, 'comment')">
+          <span class="stance-icon">🔥</span>Krytykuj
+        </button>
+        <button class="stance-btn" data-stance="pochwal" onclick="selectStance(this, 'comment')">
+          <span class="stance-icon">👏</span>Pochwal
+        </button>
+        <button class="stance-btn" data-stance="neutralnie" onclick="selectStance(this, 'comment')">
+          <span class="stance-icon">⚖️</span>Neutralnie
+        </button>
+        <button class="stance-btn" data-stance="prowokuj" onclick="selectStance(this, 'comment')">
+          <span class="stance-icon">💥</span>Prowokuj
+        </button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title">Wklej wpis z X</div>
       <textarea class="tweet-textarea" id="commentInput" placeholder="Wklej tutaj treść tweeta lub link do wpisu który chcesz skomentować..." style="border-color:var(--border);min-height:110px"></textarea>
@@ -808,6 +871,8 @@ let currentSource = null;
 let currentTopic = '';
 let editMode = false;
 let history = JSON.parse(localStorage.getItem('post_history') || '[]');
+let currentStance = 'krytykuj';
+let currentCommentStance = 'krytykuj';
 
 // ── Style descriptions for Claude ──
 const styleDescriptions = {
@@ -839,7 +904,21 @@ const styleDescriptions = {
   ].join(" ")
 };
 
-// ── Tab switching ──
+// ── Stance ──
+const stanceDescriptions = {
+  krytykuj: 'STANOWISKO: Krytyczne. Krytykuj glowny podmiot tematu, atakuj jego dzialania lub zaniechania, wskazuj bledy i konsekwencje. Ton oburzony lub ironiczny.',
+  pochwal:  'STANOWISKO: Pochwalne/obronne. Pochwal lub broń glownego podmiotu tematu, skrytykuj jego oponentow lub tych ktorzy go atakuja. Pokaz ze krytycy sie myla.',
+  neutralnie: 'STANOWISKO: Neutralne i rzeczowe. Przedstaw fakty bez wyraznej oceny, zostaw czytelnikowi wyciaganie wnioskow. Ton dziennikarski.',
+  prowokuj: 'STANOWISKO: Prowokacyjne. Postaw kontrowersyjna lub nieoczekiwana teze, ktora rozgrzeje dyskusje. Moze byc paradoksalna lub uderzac w obie strony sporu.',
+};
+
+function selectStance(el, tab) {
+  const container = tab === 'generate' ? '#tab-generate' : '#tab-comment';
+  document.querySelectorAll(container + ' .stance-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  if (tab === 'generate') currentStance = el.dataset.stance;
+  else currentCommentStance = el.dataset.stance;
+}
 function switchTab(tab) {
   const tabs = ['generate','comment','history'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', tabs[i] === tab));
@@ -961,10 +1040,11 @@ async function generatePost() {
     const prompt = [
       'Jestes agentem tworzacym posty na X dla @__Ka_mil_. Seed:' + seed,
       styleDesc,
+      stanceDescriptions[currentStance],
       'TEMAT: ' + topic,
       'KAT NARRACYJNY (obowiazkowy): ' + angle,
       avoidList,
-      'ZADANIE: 1. Wyszukaj aktualne info o temacie. 2. Znajdz 1 zrodlo. 3. Napisz post MAX 280 znakow w podanym stylu i kacie narracyjnym.',
+      'ZADANIE: 1. Wyszukaj aktualne info o temacie. 2. Znajdz 1 zrodlo. 3. Napisz post MAX 2500 znakow w podanym stylu, stanowisku i kacie narracyjnym.',
       'Odpowiedz TYLKO JSON bez zadnego tekstu przed ani po: {"post":"tekst posta","source_title":"tytul","source_url":"https://...","topic_summary":"1 zdanie"}'
     ].join('\n\n');
 
