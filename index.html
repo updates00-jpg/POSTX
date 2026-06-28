@@ -825,6 +825,11 @@
       <textarea class="tweet-textarea" id="commentInput" placeholder="Wklej tutaj treść tweeta lub link do wpisu który chcesz skomentować..." style="border-color:var(--border);min-height:110px"></textarea>
     </div>
 
+    <div class="card">
+      <div class="card-title">💡 Twoje wskazówki <span style="color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0">(opcjonalnie)</span></div>
+      <textarea class="tweet-textarea" id="commentHints" placeholder="Np. wspomnij o Wołyniu, odnieś się do kosztów, użyj argumentu o suwerenności..." style="border-color:var(--border);min-height:70px;font-size:14px"></textarea>
+    </div>
+
     <button class="btn-primary" id="commentBtn" onclick="generateComment()">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       Generuj komentarz
@@ -1516,6 +1521,7 @@ function selectCommentStyle(el) {
 
 async function generateComment() {
   const input = document.getElementById('commentInput').value.trim();
+  const hints = document.getElementById('commentHints').value.trim();
   if (!input) { showToast('⚠️ Wklej treść wpisu do skomentowania', 'error'); return; }
 
   const anthropicKey = localStorage.getItem('anthropic_key');
@@ -1607,11 +1613,12 @@ async function generateComment() {
     'Piszesz komentarz na X dla @__Ka_mil_. Seed:' + seed,
     styleDesc,
     'WPIS DO SKOMENTOWANIA: ' + input,
+    hints ? 'WSKAZOWKI UZYTKOWNIKA (OBOWIAZKOWE - uwzglednij je w komentarzu): ' + hints : '',
     'TECHNIKA (drugorzedna wobec stanowiska): ' + angle,
     avoidStr,
     'ZADANIE: Napisz komentarz zgodnie z instrukcjami powyzej.',
     'Odpowiedz TYLKO JSON: {"comment":"tresc komentarza","topic_summary":"1 zdanie o co chodzi"}'
-  ].join('\n\n');
+  ].filter(Boolean).join('\n\n');
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
