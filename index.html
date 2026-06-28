@@ -684,6 +684,20 @@
       </div>
     </div>
 
+    <!-- Article URL -->
+    <div class="card">
+      <div class="card-title">🔗 Link do artykułu <span style="color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0">(opcjonalnie)</span></div>
+      <div class="topic-wrap">
+        <input class="topic-input" id="articleUrl" type="url" placeholder="https://... wklej link do artykułu" style="padding-right:80px" />
+        <button class="topic-clear" onclick="clearArticleUrl()" style="right:44px">✕</button>
+        <button onclick="fetchArticle()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--accent);border:none;color:#fff;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:600;cursor:pointer">Wczytaj</button>
+      </div>
+      <div id="articlePreview" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:3px">📄 Wczytano artykuł:</div>
+        <div id="articlePreviewTitle" style="font-size:13px;font-weight:600;color:var(--text)"></div>
+      </div>
+    </div>
+
     <button class="btn-primary" id="generateBtn" onclick="generatePost()">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
       Generuj post
@@ -1016,12 +1030,99 @@ function selectStyle(el) {
 }
 
 // ── Topic ──
+let articleContent = '';
+let articleUrl = '';
+
 function clearTopic() {
   document.getElementById('topicInput').value = '';
   document.getElementById('topicInput').focus();
 }
 function pickTrend(el) {
   document.getElementById('topicInput').value = el.textContent;
+}
+function clearArticleUrl() {
+  document.getElementById('articleUrl').value = '';
+  document.getElementById('articlePreview').style.display = 'none';
+  articleContent = '';
+  articleUrl = '';
+}
+
+async function fetchArticle() {
+  const url = document.getElementById('articleUrl').value.trim();
+  if (!url || !url.startsWith('http')) { showToast('⚠️ Wklej poprawny link', 'error'); return; }
+
+  const anthropicKey = localStorage.getItem('anthropic_key');
+  if (!anthropicKey) { showToast('⚠️ Brak klucza Anthropic', 'error'); return; }
+
+  articleUrl = url;
+  showToast('⏳ Wczytuję artykuł...', '');
+
+  try {
+    // Use Claude to extract article content via URL
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{
+          role: 'user',
+          content: 'Wyszukaj i stresc tresci tego artykulu: ' + url + '\nOdpowiedz TYLKO JSON: {"title":"tytul artykulu","summary":"streszczenie 3-5 zdan po polsku"}'
+        }]
+      })
+    });
+
+    const d1 = await r.json();
+    let text = '';
+
+    if (d1.stop_reason === 'tool_use') {
+      const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [
+            { role: 'user', content: 'Wyszukaj i stresc tresci tego artykulu: ' + url + '\nOdpowiedz TYLKO JSON: {"title":"tytul artykulu","summary":"streszczenie 3-5 zdan po polsku"}' },
+            { role: 'assistant', content: d1.content },
+            { role: 'user', content: d1.content.filter(b => b.type === 'tool_use').map(b => ({ type: 'tool_result', tool_use_id: b.id, content: 'Gotowe. Napisz JSON.' })) }
+          ]
+        })
+      });
+      const d2 = await r2.json();
+      for (const b of (d2.content || [])) { if (b.type === 'text') text += b.text; }
+    } else {
+      for (const b of (d1.content || [])) { if (b.type === 'text') text += b.text; }
+    }
+
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('Brak odpowiedzi');
+    const parsed = JSON.parse(m[0].replace(/[\u201C\u201D]/g, '"').replace(/,\s*}/g, '}'));
+
+    articleContent = parsed.summary || '';
+    document.getElementById('articlePreviewTitle').textContent = parsed.title || url;
+    document.getElementById('articlePreview').style.display = 'block';
+    showToast('✓ Artykuł wczytany', 'success');
+
+  } catch(e) {
+    // Fallback — use URL as source, no content extraction
+    articleContent = 'Artykul z: ' + url;
+    document.getElementById('articlePreviewTitle').textContent = url;
+    document.getElementById('articlePreview').style.display = 'block';
+    showToast('✓ Link zapisany', 'success');
+  }
 }
 
 // ── Settings ──
@@ -1116,6 +1217,10 @@ async function generatePost() {
       ? 'WAZNE: Te posty juz zostaly wygenerowane, NIE powtarzaj ich struktury ani slow kluczowych: ' + prev.map((p,i) => `[${i+1}] ${p.slice(0,80)}`).join(' | ')
       : '';
 
+    const articleSection = articleContent
+      ? 'ARTYKUL ZRODLOWY (napisz post na podstawie tego):\nTytul: ' + (document.getElementById('articlePreviewTitle').textContent || '') + '\nTresc: ' + articleContent + '\nURL: ' + articleUrl
+      : '';
+
     const prompt = [
       '=== NAJWAZNIEJSZA INSTRUKCJA - PRZECZYTAJ NAJPIERW ===',
       stanceDescriptions[currentStance],
@@ -1125,11 +1230,14 @@ async function generatePost() {
       'Piszesz post na X dla @__Ka_mil_. Seed:' + seed,
       styleDesc,
       'TEMAT: ' + topic,
+      articleSection,
       'TECHNIKA (drugorzedna wobec stanowiska): ' + angle,
       avoidList,
-      'ZADANIE: 1. Uzyj web_search zeby znalezc NAJSWIEZSZY artykul (z ostatnich dni lub tygodni) na temat: ' + topic + '. 2. Na podstawie znalezionego artykulu napisz post. 3. Podaj dokladny URL do konkretnego artykulu (nie strony glownej). Napisz post zgodnie z instrukcjami powyzej.',
-      'Odpowiedz TYLKO JSON bez zadnego tekstu przed ani po: {"post":"tekst posta","source_title":"tytul artykulu","source_url":"https://pelny-url-do-artykulu","topic_summary":"1 zdanie"}'
-    ].join('\n\n');
+      articleContent
+        ? 'ZADANIE: Napisz post na podstawie dostarczonego artykulu zgodnie z instrukcjami powyzej. URL zrodla masz juz podany powyzej - uzyj go w JSON.'
+        : 'ZADANIE: 1. Uzyj web_search zeby znalezc NAJSWIEZSZY artykul na temat: ' + topic + '. 2. Napisz post. 3. Podaj dokladny URL artykulu.',
+      'Odpowiedz TYLKO JSON: {"post":"tekst posta","source_title":"tytul artykulu","source_url":"' + (articleUrl || 'https://...') + '","topic_summary":"1 zdanie"}'
+    ].filter(Boolean).join('\n\n');
 
     // Tura 1 — wywolaj web search
     const r1 = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1335,19 +1443,18 @@ async function publishPost() {
 }
 
 function showPublishConfirm(text) {
-  // Dołącz link źródła jeśli istnieje
+  // Uzyj articleUrl jesli wklejony, inaczej source z agenta
+  const sourceLink = articleUrl || (currentSource && currentSource.url && currentSource.url.startsWith('http') ? currentSource.url : '');
+
   let fullText = text;
-  if (currentSource && currentSource.url && currentSource.url.startsWith('http')) {
-    const textWithSource = text + '\n\n' + currentSource.url;
-    if (textWithSource.length <= 2500) {
-      fullText = textWithSource;
-    }
+  if (sourceLink) {
+    const withLink = text + '\n\n' + sourceLink;
+    if (withLink.length <= 2500) fullText = withLink;
   }
 
   saveToHistory(fullText, 'published');
   const encoded = encodeURIComponent(fullText);
-  const xUrl = `https://twitter.com/intent/tweet?text=${encoded}`;
-  window.open(xUrl, '_blank');
+  window.open('https://twitter.com/intent/tweet?text=' + encoded, '_blank');
   showToast('✓ Otwarto okno publikacji na X', 'success');
 }
 
