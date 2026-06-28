@@ -1058,7 +1058,7 @@ async function fetchArticle() {
   showToast('⏳ Wczytuję artykuł...', '');
 
   try {
-    // Use Claude to extract article content via URL
+    // Wyslij URL do Claude bez web search — niech sam go opisze na podstawie URL
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -1069,56 +1069,32 @@ async function fetchArticle() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        max_tokens: 512,
         messages: [{
           role: 'user',
-          content: 'Wyszukaj i stresc tresci tego artykulu: ' + url + '\nOdpowiedz TYLKO JSON: {"title":"tytul artykulu","summary":"streszczenie 3-5 zdan po polsku"}'
+          content: 'Na podstawie tego URL domysl sie o czym moze byc artykul i podaj krotkie streszczenie tematu. URL: ' + url + '\nOdpowiedz TYLKO JSON bez zadnego tekstu przed ani po: {"title":"prawdopodobny tytul artykulu","summary":"o czym moze byc artykul 2-3 zdania"}'
         }]
       })
     });
 
-    const d1 = await r.json();
-    let text = '';
+    const d = await r.json();
+    if (!r.ok) throw new Error('blad');
 
-    if (d1.stop_reason === 'tool_use') {
-      const r2 = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1024,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [
-            { role: 'user', content: 'Wyszukaj i stresc tresci tego artykulu: ' + url + '\nOdpowiedz TYLKO JSON: {"title":"tytul artykulu","summary":"streszczenie 3-5 zdan po polsku"}' },
-            { role: 'assistant', content: d1.content },
-            { role: 'user', content: d1.content.filter(b => b.type === 'tool_use').map(b => ({ type: 'tool_result', tool_use_id: b.id, content: 'Gotowe. Napisz JSON.' })) }
-          ]
-        })
-      });
-      const d2 = await r2.json();
-      for (const b of (d2.content || [])) { if (b.type === 'text') text += b.text; }
-    } else {
-      for (const b of (d1.content || [])) { if (b.type === 'text') text += b.text; }
-    }
+    let text = '';
+    for (const b of (d.content || [])) { if (b.type === 'text') text += b.text; }
 
     const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('Brak odpowiedzi');
-    const parsed = JSON.parse(m[0].replace(/[\u201C\u201D]/g, '"').replace(/,\s*}/g, '}'));
+    if (!m) throw new Error('brak json');
 
-    articleContent = parsed.summary || '';
+    const parsed = JSON.parse(m[0].replace(/[\u201C\u201D]/g, '"').replace(/,\s*}/g, '}'));
+    articleContent = parsed.summary || url;
     document.getElementById('articlePreviewTitle').textContent = parsed.title || url;
     document.getElementById('articlePreview').style.display = 'block';
     showToast('✓ Artykuł wczytany', 'success');
 
   } catch(e) {
-    // Fallback — use URL as source, no content extraction
-    articleContent = 'Artykul z: ' + url;
+    // Fallback — zapisz sam URL
+    articleContent = 'Artykul dostepny pod adresem: ' + url;
     document.getElementById('articlePreviewTitle').textContent = url;
     document.getElementById('articlePreview').style.display = 'block';
     showToast('✓ Link zapisany', 'success');
@@ -1173,7 +1149,12 @@ function stopLoader() { clearInterval(stepInterval); }
 // ── Generate ──
 async function generatePost() {
   const topic = document.getElementById('topicInput').value.trim();
-  if (!topic) { showToast('⚠️ Wpisz temat posta', 'error'); return; }
+  const hasArticle = articleContent && articleUrl;
+
+  if (!topic && !hasArticle) {
+    showToast('⚠️ Wpisz temat lub wczytaj artykuł', 'error');
+    return;
+  }
 
   const anthropicKey = localStorage.getItem('anthropic_key');
   if (!anthropicKey) {
@@ -1239,34 +1220,34 @@ async function generatePost() {
       'Odpowiedz TYLKO JSON: {"post":"tekst posta","source_title":"tytul artykulu","source_url":"' + (articleUrl || 'https://...') + '","topic_summary":"1 zdanie"}'
     ].filter(Boolean).join('\n\n');
 
-    // Tura 1 — wywolaj web search
-    const r1 = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2048,
-        temperature: 1,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    const d1 = await r1.json();
-    if (!r1.ok) throw new Error(d1.error?.message || 'Blad API tura 1');
-
+    // Jesli artykul wczytany — bez web search, proste wywolanie
+    // Jesli brak artykulu — web search dwuturowy
     let textContent = '';
 
-    // Jesli stop_reason = tool_use, wyslij wyniki i czekaj na finalna odpowiedz
-    if (d1.stop_reason === 'tool_use') {
-      document.getElementById('loaderStep').textContent = '📰 Analizuję wyniki wyszukiwania...';
+    if (articleContent) {
+      // Tryb z artykulem — brak web search, szybkie i niezawodne
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2048,
+          temperature: 1,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error?.message || 'Blad API');
+      for (const b of (d.content || [])) { if (b.type === 'text') textContent += b.text; }
 
-      const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+    } else {
+      // Tryb bez artykulu — web search dwuturowy
+      const r1 = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1279,27 +1260,40 @@ async function generatePost() {
           max_tokens: 2048,
           temperature: 1,
           tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [
-            { role: 'user', content: prompt },
-            { role: 'assistant', content: d1.content },
-            {
-              role: 'user', content: d1.content
-                .filter(b => b.type === 'tool_use')
-                .map(b => ({ type: 'tool_result', tool_use_id: b.id, content: 'Wyszukiwanie zakonczone. Teraz napisz post w JSON.' }))
-            }
-          ]
+          messages: [{ role: 'user', content: prompt }]
         })
       });
 
-      const d2 = await r2.json();
-      if (!r2.ok) throw new Error(d2.error?.message || 'Blad API tura 2');
+      const d1 = await r1.json();
+      if (!r1.ok) throw new Error(d1.error?.message || 'Blad API tura 1');
 
-      for (const b of (d2.content || [])) {
-        if (b.type === 'text') textContent += b.text;
-      }
-    } else {
-      for (const b of (d1.content || [])) {
-        if (b.type === 'text') textContent += b.text;
+      if (d1.stop_reason === 'tool_use') {
+        document.getElementById('loaderStep').textContent = '📰 Analizuję wyniki wyszukiwania...';
+        const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 2048,
+            temperature: 1,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+            messages: [
+              { role: 'user', content: prompt },
+              { role: 'assistant', content: d1.content },
+              { role: 'user', content: d1.content.filter(b => b.type === 'tool_use').map(b => ({ type: 'tool_result', tool_use_id: b.id, content: 'Wyszukiwanie zakonczone. Napisz post w JSON.' })) }
+            ]
+          })
+        });
+        const d2 = await r2.json();
+        if (!r2.ok) throw new Error(d2.error?.message || 'Blad API tura 2');
+        for (const b of (d2.content || [])) { if (b.type === 'text') textContent += b.text; }
+      } else {
+        for (const b of (d1.content || [])) { if (b.type === 'text') textContent += b.text; }
       }
     }
 
