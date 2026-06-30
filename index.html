@@ -1010,6 +1010,9 @@ const lengthDescriptions = {
   dlugi: 'DLUGOSC: Napisz DLUGO i WYCZERPUJACO — pelna argumentacja, detale, kontekst. Mozesz uzyc do 2500 znakow.',
 };
 
+// ── Typography rule ──
+const typographyRule = 'ZASADY TYPOGRAFICZNE (obowiazkowe): Jesli uzywasz cudzyslowu, uzywaj WYLACZNIE polskiego cudzyslowu „tak" (otwierajacy na dole, zamykajacy na gorze) - nigdy prostych " " ani angielskich " ". Unikaj myslnika (—, –) - zamiast niego preferuj PRZECINEK do laczenia mysli w zdaniu. Jesli myslnik jest absolutnie konieczny, uzyj zwyklego krotkiego "-" bez spacji wokol.';
+
 function selectLength(el, tab) {
   const container = tab === 'generate' ? '#tab-generate' : '#tab-comment';
   document.querySelectorAll(container + ' .stance-btn[data-length]').forEach(b => b.classList.remove('active'));
@@ -1211,6 +1214,7 @@ async function generatePost() {
       '=== NAJWAZNIEJSZA INSTRUKCJA - PRZECZYTAJ NAJPIERW ===',
       stanceDescriptions[currentStance],
       lengthDescriptions[currentLength],
+      typographyRule,
       '=== KONIEC NAJWAZNIEJSZEJ INSTRUKCJI ===',
       '',
       'Piszesz post na X dla @__Ka_mil_. Seed:' + seed,
@@ -1608,6 +1612,7 @@ async function generateComment() {
     '=== NAJWAZNIEJSZA INSTRUKCJA - PRZECZYTAJ NAJPIERW ===',
     stanceInstruction,
     lengthDescriptions[currentCommentLength],
+    typographyRule,
     '=== KONIEC NAJWAZNIEJSZEJ INSTRUKCJI ===',
     '',
     'Piszesz komentarz na X dla @__Ka_mil_. Seed:' + seed,
