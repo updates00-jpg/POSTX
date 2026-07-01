@@ -1005,10 +1005,12 @@ function selectStance(el, tab) {
 
 // ── Length ──
 const lengthDescriptions = {
-  krotki: 'DLUGOSC: Napisz BARDZO KROTKO — maksymalnie 1-2 zdania, absolutnie nie wiecej niz 140 znakow. Sama esencja, zero zbednych slow.',
-  sredni: 'DLUGOSC: Napisz SREDNIO — 3-5 zdan, okolo 200-400 znakow. Krotkie rozwinienie mysli.',
-  dlugi: 'DLUGOSC: Napisz DLUGO i WYCZERPUJACO — pelna argumentacja, detale, kontekst. Mozesz uzyc do 2500 znakow.',
+  krotki: 'DLUGOSC (OBOWIAZKOWE): Napisz BARDZO KROTKO. Maksymalnie 1-2 zdania. Nie wiecej niz 140 znakow lacznie. Sama esencja.',
+  sredni: 'DLUGOSC (OBOWIAZKOWE): Napisz tekst o dlugosci MINIMUM 300 ZNAKOW i maksimum 600 znakow. To jest 4-7 zdan. BEZWZGLEDNIE musisz napisac co najmniej 300 znakow - krocej to blad.',
+  dlugi: 'DLUGOSC (OBOWIAZKOWE): Napisz tekst o dlugosci MINIMUM 700 ZNAKOW. Moze byc do 2500 znakow. Pelna argumentacja, detale, kontekst, przyklady. BEZWZGLEDNIE musisz napisac co najmniej 700 znakow - krocej to blad.',
 };
+
+const lengthMinChars = { krotki: 0, sredni: 300, dlugi: 700 };
 
 // ── Typography rule ──
 const typographyRule = 'ZASADY TYPOGRAFICZNE (obowiazkowe): Jesli uzywasz cudzyslowu, uzywaj WYLACZNIE polskiego cudzyslowu „tak" (otwierajacy na dole, zamykajacy na gorze) - nigdy prostych " " ani angielskich " ". Unikaj myslnika (—, –) - zamiast niego preferuj PRZECINEK do laczenia mysli w zdaniu. Jesli myslnik jest absolutnie konieczny, uzyj zwyklego krotkiego "-" bez spacji wokol.';
@@ -1337,7 +1339,7 @@ async function generatePost() {
         topic_summary: ''
       };
     }
-    currentPost = result.post;
+    currentPost = normalizeTypography(result.post);
     currentSource = { title: result.source_title, url: result.source_url };
 
     // Zapamiętaj wygenerowane posty żeby unikać powtórzeń
@@ -1497,6 +1499,17 @@ function escapeHtml(t) {
   return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// ── Typography normalization (safety net) ──
+function normalizeTypography(text) {
+  if (!text) return text;
+  return text
+    .replace(/[\u201C\u201D\u00AB\u00BB]/g, '"')   // wszelkie inne cudzyslowy -> tymczasowo proste
+    .replace(/"([^"]*)"/g, '\u201E$1\u201D')        // proste " " -> polskie „ "
+    .replace(/[\u2013\u2014]/g, ',')                 // em/en dash -> przecinek (preferencja)
+    .replace(/\s,\s/g, ', ')                          // porzadkuj spacje wokol przecinka
+    .replace(/,{2,}/g, ',');                          // usun zdublowane przecinki
+}
+
 function formatDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('pl-PL', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
@@ -1636,7 +1649,7 @@ async function generateComment() {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
+        max_tokens: 2048,
         temperature: 1,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -1667,7 +1680,45 @@ async function generateComment() {
       result = { comment: m[1].replace(/\\"/g, '"') };
     }
 
-    currentComment = result.comment;
+    currentComment = normalizeTypography(result.comment);
+
+    // Walidacja dlugosci — jesli za krotki, wyslij drugi request z wymogiem rozbudowania
+    const minChars = lengthMinChars[currentCommentLength] || 0;
+    if (currentComment.length < minChars) {
+      document.getElementById('commentLoaderStep').textContent = '📝 Rozbudowuję komentarz...';
+      const retryResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2048,
+          temperature: 1,
+          messages: [
+            { role: 'user', content: prompt },
+            { role: 'assistant', content: JSON.stringify({ comment: currentComment }) },
+            { role: 'user', content: 'Twoj komentarz ma tylko ' + currentComment.length + ' znakow a minimum to ' + minChars + ' znakow. Rozbuduj go znacznie - dodaj argumenty, kontekst, przyklady. Zachowaj styl i stanowisko. Odpowiedz TYLKO JSON: {"comment":"rozbudowany komentarz","topic_summary":"1 zdanie"}' }
+          ]
+        })
+      });
+      const retryData = await retryResponse.json();
+      let retryText = '';
+      for (const b of (retryData.content || [])) { if (b.type === 'text') retryText += b.text; }
+      const retryMatch = retryText.match(/\{[\s\S]*\}/);
+      if (retryMatch) {
+        try {
+          const retryResult = JSON.parse(retryMatch[0].replace(/[\u201C\u201D]/g, '"').replace(/,\s*}/g, '}'));
+          if (retryResult.comment && retryResult.comment.length > currentComment.length) {
+            currentComment = normalizeTypography(retryResult.comment);
+          }
+        } catch(e) {}
+      }
+    }
+
     window._prevComments = window._prevComments || [];
     window._prevComments.push(currentComment);
     if (window._prevComments.length > 5) window._prevComments.shift();
